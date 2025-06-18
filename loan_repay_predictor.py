@@ -30,7 +30,7 @@ def generate_queries(job_title, company, industry):
     return queries
 
 # Dummy search for now
-def search_web(query, num_results=3):
+def search_web(query, borrower_id=None, num_results=3):
     params = {
         "engine": "google",
         "q": query,
@@ -50,6 +50,13 @@ def search_web(query, num_results=3):
             articles.append(f"{title}\n{snippet}\n{link}")
     except Exception as e:
         print(f"Error fetching results: {e}")
+
+     # Save articles to a file (optional: borrower_id included in filename)
+    safe_query = query.replace(" ", "_").replace("/", "_")
+    filename = f"articles/{borrower_id}_{safe_query[:50]}.txt" if borrower_id else f"articles/{safe_query[:50]}.txt"
+
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write("\n\n".join(articles))
 
     # Be polite to the API
     time.sleep(1)
