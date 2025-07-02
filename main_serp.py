@@ -1,8 +1,8 @@
 import os
 import requests
-from serpapi import GoogleSearch
 from urllib.parse import urlparse
 import hashlib
+import json
 
 # ---------------- Query Generator ----------------
 def generate_queries(job_title, company, industry, years_ahead=5):
@@ -22,18 +22,26 @@ def generate_queries(job_title, company, industry, years_ahead=5):
     ]
     return queries
 
-# ---------------- SerpAPI + Save ----------------
+# ---------------- SERPAPI Request + Save ----------------
 def search_and_save(query, borrower_id, serpapi_api_key, num_results=3):
     os.makedirs('articles', exist_ok=True)
 
+    # Call SerpAPI using requests
     params = {
         "engine": "google",
         "q": query,
         "api_key": serpapi_api_key,
         "num": num_results
     }
-    search = GoogleSearch(params)
-    results = search.get_dict()
+    serpapi_url = "https://serpapi.com/search"
+
+    try:
+        resp = requests.get(serpapi_url, params=params, timeout=15, verify=False)
+        resp.raise_for_status()
+        results = resp.json()
+    except Exception as e:
+        print(f"Failed SerpAPI request: {e}")
+        return []
 
     links = []
     if "organic_results" in results:
@@ -45,7 +53,7 @@ def search_and_save(query, borrower_id, serpapi_api_key, num_results=3):
     saved_files = []
     for idx, url in enumerate(links):
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=10, verify=False)
             response.raise_for_status()
             content = response.text
 
