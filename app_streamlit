@@ -1,11 +1,13 @@
 import streamlit as st
 import pandas as pd
 import os
+import asyncio
+
 from main_serp import generate_queries, search_and_save
+from uploader import connect_to_existing_browser_and_send_prompt2
 
-SERPAPI_API_KEY = "YOUR_SERPAPI_KEY"  # Replace with your actual key
+SERPAPI_API_KEY = "YOUR_SERPAPI_KEY"  # Replace
 
-# ---------------- Query Keys ----------------
 QUERY_KEYS = [
     "Stock performance outlook",
     "Industry recession/growth",
@@ -23,7 +25,6 @@ QUERY_KEYS = [
 
 KEY_TO_INDEX = {k: i for i, k in enumerate(QUERY_KEYS)}
 
-# ---------------- Web Search Logic ----------------
 def perform_web_search(borrower_info, selected_keys, years_ahead):
     job_title = borrower_info["job_title"]
     company = borrower_info["company"]
@@ -40,143 +41,419 @@ def perform_web_search(borrower_info, selected_keys, years_ahead):
 
     return all_cleaned_files
 
-# ---------------- Streamlit Layout ----------------
+async def summarize_with_playwright(prompt):
+    response_text = await connect_to_existing_browser_and_send_prompt2(prompt)
+    return response_text
+
+# Configure page
 st.set_page_config(page_title="Borrower Risk Assessment", layout="wide")
 
-st.title("🔍 Borrower Risk Assessment Web Search Tool")
-st.sidebar.header("Settings")
+# Custom CSS for better styling
+st.markdown("""
+<style>
+    .main-header {
+        text-align: center;
+        color: #1f77b4;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        background: linear-gradient(90deg, #f0f2f6, #ffffff, #f0f2f6);
+        border-radius: 10px;
+    }
+    .section-header {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+        margin-bottom: 2rem;
+        margin-top: 0.5rem;
+    }
+    .query-section {
+        padding: 1.5rem;
+        height: 500px;
+        overflow-y: auto;
+    }
+    .form-section {
+        background-color: #ffffff;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border: 1px solid #dee2e6;
+    }
+    .stCheckbox > label {
+        font-weight: 500;
+        color: #495057;
+    }
+    .upload-section {
+        background-color: #e8f4fd;
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px dashed #3498db;
+    }
+    .summary-section {
+        background-color: #f9f9f9;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border: 1px solid #dee2e6;
+        margin-top: 2rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-input_mode = st.sidebar.radio("Input Mode:", ("Manual Form", "Upload CSV File"))
-years_ahead = st.sidebar.number_input("Years Ahead", min_value=1, max_value=50, value=5)
-debug_mode = st.sidebar.checkbox("Debug Mode (no search, upload articles manually)")
+# Main header
+st.markdown('<div class="main-header"><h1>🔍 Borrower Risk Assessment Web Search Tool</h1></div>', unsafe_allow_html=True)
 
+# Top controls row
+col_control1, col_control2, col_control3, col_control4 = st.columns([2, 2, 2, 2])
+
+with col_control1:
+    input_mode = st.selectbox("📋 Input Mode:", ("Manual Form", "Upload CSV File"))
+
+with col_control2:
+    years_ahead = st.number_input("📅 Years Ahead", min_value=1, max_value=50, value=5)
+
+with col_control3:
+    debug_mode = st.checkbox("🐛 Debug Mode")
+
+with col_control4:
+    st.write("") # Spacer
+
+# Main content layout
 if input_mode == "Manual Form":
-    st.header("👤 Borrower Information")
+    # Two-column layout for form and queries
+    form_col, query_col = st.columns([3, 2])
+    
+    with form_col:
+        st.markdown('<div class="form-section">', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">👤 Borrower Information</h3>', unsafe_allow_html=True)
+        
+        # Initialize session state for form data
+        if 'form_submitted' not in st.session_state:
+            st.session_state.form_submitted = False
+        
+        with st.form("borrower_form", clear_on_submit=False):
+            # Personal Info
+            st.markdown("**Personal Details**")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                borrower_id = st.text_input("🆔 Borrower ID", key="bid")
+            with col2:
+                borrower_name = st.text_input("👤 Name", key="bname")
+            with col3:
+                age = st.number_input("🎂 Age", min_value=0, step=1, key="bage")
 
-    with st.form("borrower_form"):
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            borrower_id = st.text_input("Borrower ID")
-        with col2:
-            borrower_name = st.text_input("Name")
-        with col3:
-            age = st.number_input("Age", min_value=0, step=1)
+            st.markdown("**Loan Details**")
+            col4, col5, col6 = st.columns(3)
+            with col4:
+                loan_amount = st.number_input("💰 Loan Amount", min_value=0.0, step=1000.0, format="%.2f", key="lamount")
+            with col5:
+                loan_start_year = st.number_input("📅 Loan Start Year", min_value=1900, max_value=2100, step=1, key="lyear")
+            with col6:
+                location = st.text_input("📍 Location", key="bloc")
 
-        col4, col5, col6 = st.columns(3)
-        with col4:
-            loan_amount = st.number_input("Loan Amount", min_value=0.0, step=1000.0)
-        with col5:
-            loan_start_year = st.number_input("Loan Start Year", min_value=1900, max_value=2100)
-        with col6:
-            location = st.text_input("Location")
+            st.markdown("**Employment Info**")
+            col7, col8 = st.columns(2)
+            with col7:
+                job_title = st.text_input("💼 Job Title", key="jtitle")
+            with col8:
+                company = st.text_input("🏢 Company", key="bcompany")
 
-        col7, col8 = st.columns(2)
-        with col7:
-            job_title = st.text_input("Job Title")
-        with col8:
-            company = st.text_input("Company")
+            col9, col10 = st.columns(2)
+            with col9:
+                industry = st.text_input("🏭 Industry", key="bindustry")
+            with col10:
+                repayments_on_time = st.number_input("✅ Repayments On Time", min_value=0, step=1, key="rontime")
 
-        col9, col10 = st.columns(2)
-        with col9:
-            industry = st.text_input("Industry")
-        with col10:
-            repayments_on_time = st.number_input("Repayments On Time", min_value=0, step=1)
+            st.markdown("**Payment History**")
+            col11, col12 = st.columns(2)
+            with col11:
+                late_payments = st.number_input("⚠️ Late Payments", min_value=0, step=1, key="lpayments")
+            with col12:
+                avg_days_late = st.number_input("📊 Avg Days Late", min_value=0.0, step=1.0, key="dayslate")
 
-        col11, col12 = st.columns(2)
-        with col11:
-            late_payments = st.number_input("Late Payments", min_value=0, step=1)
-        with col12:
-            avg_days_late = st.number_input("Avg Days Late", min_value=0.0, step=1.0)
+            submitted = st.form_submit_button("📝 Update Form Data", use_container_width=True)
 
-        submitted = st.form_submit_button("Submit")
+        if submitted:
+            st.session_state.form_submitted = True
+            st.session_state.borrower_info = {
+                "borrower_id": borrower_id,
+                "borrower_name": borrower_name,
+                "loan_amount": loan_amount,
+                "loan_start_year": loan_start_year,
+                "job_title": job_title,
+                "company": company,
+                "industry": industry,
+                "repayments_on_time": repayments_on_time,
+                "late_payments": late_payments,
+                "avg_days_late": avg_days_late,
+                "age": age,
+                "location": location
+            }
+            st.success("✅ Form data updated!")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    if submitted:
-        borrower_info = {
-            "borrower_id": borrower_id,
-            "borrower_name": borrower_name,
-            "loan_amount": loan_amount,
-            "loan_start_year": loan_start_year,
-            "job_title": job_title,
-            "company": company,
-            "industry": industry,
-            "repayments_on_time": repayments_on_time,
-            "late_payments": late_payments,
-            "avg_days_late": avg_days_late,
-            "age": age,
-            "location": location
-        }
+    with query_col:
+        st.markdown('<div class="query-section">', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">🎯 Select Query Attributes</h3>', unsafe_allow_html=True)
+        
+        # Select All / Deselect All buttons
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            if st.button("✅ Select All", use_container_width=True):
+                for key in QUERY_KEYS:
+                    st.session_state[f"check_{key}"] = True
+        with col_btn2:
+            if st.button("❌ Clear All", use_container_width=True):
+                for key in QUERY_KEYS:
+                    st.session_state[f"check_{key}"] = False
+        
+        st.markdown("---")
+        
+        # Query checkboxes with categories
+        financial_queries = ["Stock performance outlook", "Industry recession/growth", "Company M&A possibility"]
+        job_queries = ["Job automation risk", "Job market demand", "Product relevance", "Skill obsolescence", "Replaceability risk"]
+        social_queries = ["Pollution projection", "Disease risk in polluted zones", "College education cost", "Financial burden of children"]
+        
+        st.markdown("**💼 Financial & Market Risk**")
+        for key in financial_queries:
+            st.checkbox(key, key=f"check_{key}")
+        
+        st.markdown("**🔧 Employment Risk**") 
+        for key in job_queries:
+            st.checkbox(key, key=f"check_{key}")
+            
+        st.markdown("**🌍 Social & Environmental Risk**")
+        for key in social_queries:
+            st.checkbox(key, key=f"check_{key}")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        st.header("Select Query Attributes")
-        selected_keys = [key for key in QUERY_KEYS if st.checkbox(key, key=f"chk_{key}")]
-
+    # Action buttons and results at the bottom
+    st.markdown("---")
+    
+    if st.session_state.get('form_submitted', False):
+        selected_keys = [key for key in QUERY_KEYS if st.session_state.get(f"check_{key}", False)]
+        
+        col_action1, col_action2, col_action3 = st.columns([2, 2, 4])
+        
+        with col_action1:
+            st.metric("Selected Queries", len(selected_keys))
+        
+        with col_action2:
+            if debug_mode:
+                st.info("🐛 Debug Mode Active")
+            else:
+                st.info("🔍 Search Mode Active")
+        
         if debug_mode:
-            st.warning("Debug mode active: Upload articles manually below.")
-            uploaded_files = st.file_uploader("Upload article text files", type=["txt"], accept_multiple_files=True)
-            if uploaded_files:
-                os.makedirs("articles/debug_manual", exist_ok=True)
-                for file in uploaded_files:
-                    save_path = os.path.join("articles/debug_manual", f"{borrower_id}_{file.name}")
-                    with open(save_path, "wb") as f:
-                        f.write(file.read())
-                st.success("Files saved!")
+            with col_action3:
+                st.markdown('<div class="upload-section">', unsafe_allow_html=True)
+                st.markdown("**📁 Upload Article Files Manually**")
+                uploaded_files = st.file_uploader("Upload article text files", type=["txt"], accept_multiple_files=True, key="debug_upload")
+                if uploaded_files and st.button("💾 Save Files", key="debug_save"):
+                    os.makedirs("articles/debug_manual", exist_ok=True)
+                    for file in uploaded_files:
+                        save_path = os.path.join("articles/debug_manual", f"{st.session_state.borrower_info['borrower_id']}_{file.name}")
+                        with open(save_path, "wb") as f:
+                            f.write(file.read())
+                    st.success("✅ Files saved manually!")
+                st.markdown('</div>', unsafe_allow_html=True)
         else:
-            if st.button("Start Web Search"):
-                if selected_keys:
-                    with st.spinner("Searching and cleaning articles..."):
-                        cleaned_files = perform_web_search(borrower_info, selected_keys, years_ahead)
-                    st.success(f"Saved {len(cleaned_files)} cleaned articles!")
+            with col_action3:
+                if st.button("🚀 Start Full Pipeline", use_container_width=True, type="primary"):
+                    if selected_keys:
+                        # Step 1: Web Search and Cleaning
+                        with st.spinner("🔍 Performing web search and cleaning articles..."):
+                            cleaned_files = perform_web_search(st.session_state.borrower_info, selected_keys, years_ahead)
+                        
+                        if cleaned_files:
+                            st.success(f"✅ Cleaned and saved {len(cleaned_files)} articles!")
+                            
+                            # Preview cleaned articles
+                            with st.expander("📄 Preview Cleaned Articles", expanded=False):
+                                for file in cleaned_files:
+                                    st.markdown(f"**{os.path.basename(file)}**")
+                                    try:
+                                        with open(file, "r", encoding="utf-8") as f:
+                                            text_content = f.read()
+                                            st.text_area("", text_content[:4000], height=200, key=f"preview_{file}")
+                                    except Exception as e:
+                                        st.error(f"Error reading file: {e}")
+                            
+                            # Step 2: Generate Summary
+                            borrower_info = st.session_state.borrower_info
+                            prompt = f"""
+Take this data:
+borrower_id,borrower_name,loan_amount,loan_start_year,job_title,company,industry,repayments_on_time,late_payments,avg_days_late,age,location
+{borrower_info['borrower_id']},{borrower_info['borrower_name']},{borrower_info['loan_amount']},{borrower_info['loan_start_year']},{borrower_info['job_title']},{borrower_info['company']},{borrower_info['industry']},{borrower_info['repayments_on_time']},{borrower_info['late_payments']},{borrower_info['avg_days_late']},{borrower_info['age']},{borrower_info['location']}
 
-                    with st.expander("📄 Preview Cleaned Articles"):
-                        for file in cleaned_files:
-                            st.markdown(f"**{os.path.basename(file)}**")
-                            with open(file, "r", encoding="utf-8") as f:
-                                text_content = f.read()
-                                st.text_area("", text_content[:4000], height=300, key=file)
-                else:
-                    st.error("Please select at least one query attribute.")
+Search through the attached documents and act as a financial analyst. Based on the information, summarize and analyze the borrower's financial and employment risks, as well as market and environmental context.
+"""
+                            
+                            with st.spinner("🤖 Generating AI summary from cleaned articles..."):
+                                try:
+                                    response_text = asyncio.run(summarize_with_playwright(prompt))
+                                    
+                                    # Display summary
+                                    if os.path.exists("./responses/response.txt"):
+                                        with open("./responses/response.txt", "r", encoding="utf-8") as f:
+                                            summary = f.read()
+                                        
+                                        st.markdown('<div class="summary-section">', unsafe_allow_html=True)
+                                        st.markdown('<h3 class="section-header">📊 AI Risk Analysis Summary</h3>', unsafe_allow_html=True)
+                                        st.markdown(summary)
+                                        st.markdown('</div>', unsafe_allow_html=True)
+                                        
+                                        # Download button for summary
+                                        st.download_button(
+                                            label="💾 Download Summary",
+                                            data=summary,
+                                            file_name=f"risk_summary_{borrower_info['borrower_id']}.txt",
+                                            mime="text/plain"
+                                        )
+                                    else:
+                                        st.warning("⚠️ Summary file not found.")
+                                        
+                                except Exception as e:
+                                    st.error(f"❌ Error generating summary: {e}")
+                        else:
+                            st.warning("⚠️ No articles were cleaned and saved.")
+                    else:
+                        st.error("❌ Please select at least one query attribute.")
 
-else:  # CSV mode
-    st.header("📄 Upload Borrower CSV File")
-    csv_file = st.file_uploader("Upload CSV", type=["csv"])
-    if csv_file is not None:
-        df = pd.read_csv(csv_file)
-        st.success(f"Loaded {len(df)} borrowers")
-        st.dataframe(df)
+else:  # CSV Upload Mode
+    # Two-column layout for CSV and queries
+    csv_col, query_col = st.columns([3, 2])
+    
+    with csv_col:
+        st.markdown('<div class="form-section">', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">📊 Upload Borrower CSV File</h3>', unsafe_allow_html=True)
+        
+        csv_file = st.file_uploader("📁 Upload CSV", type=["csv"])
+        
+        if csv_file is not None:
+            df = pd.read_csv(csv_file)
+            st.success(f"✅ Loaded {len(df)} borrowers")
+            
+            with st.expander("👀 Preview Data", expanded=True):
+                st.dataframe(df, use_container_width=True)
+            
+            st.session_state.csv_loaded = True
+            st.session_state.df = df
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        st.header("Select Query Attributes")
-        selected_keys = [key for key in QUERY_KEYS if st.checkbox(key, key=f"csvchk_{key}")]
+    with query_col:
+        st.markdown('<div class="query-section">', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">🎯 Select Query Attributes</h3>', unsafe_allow_html=True)
+        
+        # Select All / Deselect All buttons
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            if st.button("✅ Select All", use_container_width=True, key="csv_select_all"):
+                for key in QUERY_KEYS:
+                    st.session_state[f"csv_check_{key}"] = True
+        with col_btn2:
+            if st.button("❌ Clear All", use_container_width=True, key="csv_clear_all"):
+                for key in QUERY_KEYS:
+                    st.session_state[f"csv_check_{key}"] = False
+        
+        st.markdown("---")
+        
+        # Query checkboxes (same categories as before)
+        st.markdown("**💼 Financial & Market Risk**")
+        for key in ["Stock performance outlook", "Industry recession/growth", "Company M&A possibility"]:
+            st.checkbox(key, key=f"csv_check_{key}")
+        
+        st.markdown("**🔧 Employment Risk**") 
+        for key in ["Job automation risk", "Job market demand", "Product relevance", "Skill obsolescence", "Replaceability risk"]:
+            st.checkbox(key, key=f"csv_check_{key}")
+            
+        st.markdown("**🌍 Social & Environmental Risk**")
+        for key in ["Pollution projection", "Disease risk in polluted zones", "College education cost", "Financial burden of children"]:
+            st.checkbox(key, key=f"csv_check_{key}")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
+    # CSV Action section at the bottom
+    st.markdown("---")
+    
+    if st.session_state.get('csv_loaded', False):
+        selected_keys = [key for key in QUERY_KEYS if st.session_state.get(f"csv_check_{key}", False)]
+        
+        col_csv1, col_csv2, col_csv3 = st.columns([2, 2, 4])
+        
+        with col_csv1:
+            st.metric("Borrowers", len(st.session_state.df))
+        
+        with col_csv2:
+            st.metric("Selected Queries", len(selected_keys))
+        
         if debug_mode:
-            st.warning("Debug mode active: Upload articles manually below.")
-            uploaded_files = st.file_uploader("Upload article text files", type=["txt"], accept_multiple_files=True)
-            if uploaded_files:
-                os.makedirs("articles/debug_manual", exist_ok=True)
-                for file in uploaded_files:
-                    save_path = os.path.join("articles/debug_manual", f"csv_{file.name}")
-                    with open(save_path, "wb") as f:
-                        f.write(file.read())
-                st.success("Files saved!")
+            with col_csv3:
+                st.markdown('<div class="upload-section">', unsafe_allow_html=True)
+                st.markdown("**📁 Upload Article Files (for all borrowers)**")
+                uploaded_files = st.file_uploader("Upload article text files", type=["txt"], accept_multiple_files=True, key="csv_upload")
+                if uploaded_files and st.button("💾 Save Files", key="csv_save"):
+                    os.makedirs("articles/debug_manual", exist_ok=True)
+                    for file in uploaded_files:
+                        save_path = os.path.join("articles/debug_manual", f"debug_{file.name}")
+                        with open(save_path, "wb") as f:
+                            f.write(file.read())
+                    st.success("✅ Files saved!")
+                st.markdown('</div>', unsafe_allow_html=True)
         else:
-            if st.button("Process All Borrowers"):
-                if selected_keys:
-                    progress_bar = st.progress(0)
-                    for idx, row in df.iterrows():
-                        borrower_info = {
-                            "borrower_id": str(row["borrower_id"]),
-                            "borrower_name": row["borrower_name"],
-                            "loan_amount": row["loan_amount"],
-                            "loan_start_year": row["loan_start_year"],
-                            "job_title": row["job_title"],
-                            "company": row["company"],
-                            "industry": row["industry"],
-                            "repayments_on_time": row["repayments_on_time"],
-                            "late_payments": row["late_payments"],
-                            "avg_days_late": row["avg_days_late"],
-                            "age": row["age"],
-                            "location": row["location"]
-                        }
-                        perform_web_search(borrower_info, selected_keys, years_ahead)
-                        progress_bar.progress((idx + 1) / len(df))
-                    st.success("Done processing all borrowers!")
-                else:
-                    st.error("Please select at least one query attribute.")
+            with col_csv3:
+                if st.button("🚀 Process All Borrowers", use_container_width=True, type="primary"):
+                    if selected_keys:
+                        progress_bar = st.progress(0)
+                        total = len(st.session_state.df)
+                        
+                        results_container = st.container()
+                        
+                        for idx, row in st.session_state.df.iterrows():
+                            borrower_info = {
+                                "borrower_id": str(row["borrower_id"]),
+                                "borrower_name": row["borrower_name"],
+                                "loan_amount": row["loan_amount"],
+                                "loan_start_year": row["loan_start_year"],
+                                "job_title": row["job_title"],
+                                "company": row["company"],
+                                "industry": row["industry"],
+                                "repayments_on_time": row["repayments_on_time"],
+                                "late_payments": row["late_payments"],
+                                "avg_days_late": row["avg_days_late"],
+                                "age": row["age"],
+                                "location": row["location"]
+                            }
+
+                            with results_container:
+                                st.write(f"Processing: {borrower_info['borrower_name']} (ID: {borrower_info['borrower_id']})")
+                            
+                            # Perform web search and cleaning
+                            cleaned_files = perform_web_search(borrower_info, selected_keys, years_ahead)
+                            
+                            # Generate summary for each borrower
+                            if cleaned_files:
+                                prompt = f"""
+Take this data:
+borrower_id,borrower_name,loan_amount,loan_start_year,job_title,company,industry,repayments_on_time,late_payments,avg_days_late,age,location
+{borrower_info['borrower_id']},{borrower_info['borrower_name']},{borrower_info['loan_amount']},{borrower_info['loan_start_year']},{borrower_info['job_title']},{borrower_info['company']},{borrower_info['industry']},{borrower_info['repayments_on_time']},{borrower_info['late_payments']},{borrower_info['avg_days_late']},{borrower_info['age']},{borrower_info['location']}
+
+Search through the attached documents and act as a financial analyst. Based on the information, summarize and analyze the borrower's financial and employment risks, as well as market and environmental context.
+"""
+                                
+                                try:
+                                    response_text = asyncio.run(summarize_with_playwright(prompt))
+                                    with results_container:
+                                        st.success(f"✅ {borrower_info['borrower_name']}: {len(cleaned_files)} articles processed + summary generated")
+                                except Exception as e:
+                                    with results_container:
+                                        st.error(f"❌ {borrower_info['borrower_name']}: Error generating summary - {e}")
+                            else:
+                                with results_container:
+                                    st.warning(f"⚠️ {borrower_info['borrower_name']}: No articles found")
+
+                            progress_bar.progress((idx + 1) / total)
+
+                        st.success("🎉 Completed processing all borrowers!")
+                    else:
+                        st.error("❌ Please select at least one query attribute.")
