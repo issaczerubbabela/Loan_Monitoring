@@ -59,14 +59,12 @@ st.markdown("""
     .section-header {
         color: #2c3e50;
         border-bottom: 2px solid #3498db;
-        padding-bottom: 5px;
-        margin-bottom: 1rem;
+        padding-bottom: 10px;
+        margin-bottom: 2rem;
+        margin-top: 0.5rem;
     }
     .query-section {
-        background-color: #f8f9fa;
         padding: 1.5rem;
-        border-radius: 10px;
-        border: 1px solid #dee2e6;
         height: 500px;
         overflow-y: auto;
     }
