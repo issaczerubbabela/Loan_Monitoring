@@ -1,0 +1,50 @@
+import streamlit as st
+import asyncio
+import os
+
+# 👇 Import your uploader function
+from uploader import run_uploader
+
+response_file = "./responses/response.txt"
+
+# Button to start uploader
+if st.button("🚀 Run Summarizer (Uploader)", type="primary"):
+    st.info("Running uploader... Please wait.")
+    progress_placeholder = st.empty()
+
+    # Remove old response if needed
+    if os.path.exists(response_file):
+        os.remove(response_file)
+
+    # Run uploader async
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(run_uploader())
+        loop.close()
+    except Exception as e:
+        st.error(f"Uploader failed: {str(e)}")
+
+    # Wait for the response file to appear
+    wait_time = 0
+    max_wait = 300  # seconds
+    progress_bar = st.progress(0, text="Waiting for summarized response...")
+
+    while not os.path.exists(response_file) and wait_time < max_wait:
+        time.sleep(2)
+        wait_time += 2
+        progress_percent = min(int((wait_time / max_wait) * 100), 100)
+        progress_bar.progress(progress_percent, text=f"Waiting... {progress_percent}%")
+
+    if os.path.exists(response_file):
+        progress_bar.progress(100, text="✅ Response ready!")
+        st.success("Summarized response is ready!")
+
+        with open(response_file, "r", encoding="utf-8") as f:
+            summary_text = f.read()
+
+        st.markdown("### 📄 Summarized Response Preview")
+        st.text_area("Response Text", summary_text[:10000], height=400)
+    else:
+        progress_bar.progress(100, text="❌ Timeout or file not found.")
+        st.error("Response file not found after waiting.")
