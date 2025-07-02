@@ -37,21 +37,42 @@ if attr_litigation_history:
     selected_attributes.append("Litigation History")
 
 if input_mode == "Manual Form":
-    st.subheader("Borrower Information Form")
+    st.subheader("Borrower Information (Compact Form)")
 
     with st.form("borrower_form"):
-        borrower_id = st.text_input("Borrower ID")
-        borrower_name = st.text_input("Borrower Name")
-        loan_amount = st.number_input("Loan Amount", min_value=0.0, step=1000.0, format="%.2f")
-        loan_start_year = st.number_input("Loan Start Year", min_value=1900, max_value=2100, step=1)
-        job_title = st.text_input("Job Title")
-        company = st.text_input("Company")
-        industry = st.text_input("Industry")
-        repayments_on_time = st.number_input("Repayments On Time", min_value=0, step=1)
-        late_payments = st.number_input("Late Payments", min_value=0, step=1)
-        avg_days_late = st.number_input("Average Days Late", min_value=0.0, step=1.0)
-        age = st.number_input("Age", min_value=0, step=1)
-        location = st.text_input("Location")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            borrower_id = st.text_input("Borrower ID")
+        with col2:
+            borrower_name = st.text_input("Name")
+        with col3:
+            age = st.number_input("Age", min_value=0, step=1)
+
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            loan_amount = st.number_input("Loan Amount", min_value=0.0, step=1000.0, format="%.2f")
+        with col5:
+            loan_start_year = st.number_input("Loan Start Year", min_value=1900, max_value=2100, step=1)
+        with col6:
+            location = st.text_input("Location")
+
+        col7, col8 = st.columns(2)
+        with col7:
+            job_title = st.text_input("Job Title")
+        with col8:
+            company = st.text_input("Company")
+
+        col9, col10 = st.columns(2)
+        with col9:
+            industry = st.text_input("Industry")
+        with col10:
+            repayments_on_time = st.number_input("Repayments On Time", min_value=0, step=1)
+
+        col11, col12 = st.columns(2)
+        with col11:
+            late_payments = st.number_input("Late Payments", min_value=0, step=1)
+        with col12:
+            avg_days_late = st.number_input("Avg Days Late", min_value=0.0, step=1.0)
 
         submitted = st.form_submit_button("Submit and Search")
 
@@ -106,6 +127,6 @@ else:
 
                 # Call your SERP API function
                 article_file = perform_web_search(borrower_info, selected_attributes)
-                st.write(f"Processed Borrower ID {borrower_info['borrower_id']}: Articles saved to {article_file}")
+                st.write(f"Processed Borrower ID {borrower_info['borrower_id']']}: Articles saved to {article_file}")
 
             st.success("Completed web search for all borrowers in CSV.")
