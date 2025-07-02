@@ -1,10 +1,7 @@
 import os
 import requests
-from urllib.parse import urlparse
-import hashlib
-import json
+from bs4 import BeautifulSoup
 
-# ---------------- Query Generator ----------------
 def generate_queries(job_title, company, industry, years_ahead=5):
     queries = [
         f"{company} stock performance {years_ahead}-year outlook",
@@ -22,52 +19,58 @@ def generate_queries(job_title, company, industry, years_ahead=5):
     ]
     return queries
 
-# ---------------- SERPAPI Request + Save ----------------
-def search_and_save(query, borrower_id, serpapi_api_key, num_results=3):
-    os.makedirs('articles', exist_ok=True)
+def search_and_save(query, borrower_id, serpapi_api_key, attribute_key, clean=True):
+    os.makedirs("articles/html", exist_ok=True)
+    os.makedirs("articles/clean", exist_ok=True)
 
-    # Call SerpAPI using requests
     params = {
-        "engine": "google",
         "q": query,
         "api_key": serpapi_api_key,
-        "num": num_results
+        "engine": "google",
+        "num": "5"
     }
-    serpapi_url = "https://serpapi.com/search"
 
-    try:
-        resp = requests.get(serpapi_url, params=params, timeout=15, verify=False)
-        resp.raise_for_status()
-        results = resp.json()
-    except Exception as e:
-        print(f"Failed SerpAPI request: {e}")
-        return []
-
-    links = []
-    if "organic_results" in results:
-        for res in results["organic_results"]:
-            link = res.get("link")
-            if link:
-                links.append(link)
+    response = requests.get("https://serpapi.com/search", params=params, verify=False)
+    data = response.json()
 
     saved_files = []
-    for idx, url in enumerate(links):
-        try:
-            response = requests.get(url, timeout=10, verify=False)
-            response.raise_for_status()
-            content = response.text
 
-            url_hash = hashlib.md5(url.encode()).hexdigest()
-            parsed = urlparse(url)
-            domain = parsed.netloc.replace(".", "_")
-            filename = f"articles/{borrower_id}_q{idx+1}_{domain}_{url_hash}.html"
+    if "organic_results" in data:
+        for idx, result in enumerate(data["organic_results"][:3]):
+            link = result.get("link")
+            if link:
+                try:
+                    page = requests.get(link, timeout=10, verify=False)
+                    raw_html = page.text
 
-            with open(filename, "w", encoding="utf-8") as f:
-                f.write(content)
+                    html_filename = f"articles/html/{borrower_id}_{attribute_key}_{idx+1}.html"
+                    with open(html_filename, "w", encoding="utf-8") as f:
+                        f.write(raw_html)
 
-            saved_files.append(filename)
-
-        except Exception as e:
-            print(f"Failed to fetch {url}: {e}")
+                    if clean:
+                        clean_filename = clean_file(html_filename, borrower_id, attribute_key, idx+1)
+                        saved_files.append(clean_filename)
+                    else:
+                        saved_files.append(html_filename)
+                except Exception as e:
+                    print(f"Failed to fetch content from {link}: {e}")
 
     return saved_files
+
+def clean_file(html_path, borrower_id, attribute_key, idx):
+    with open(html_path, "r", encoding="utf-8") as f:
+        soup = BeautifulSoup(f, "html.parser")
+
+    for tag in soup(["script", "style", "header", "footer", "nav", "aside"]):
+        tag.decompose()
+
+    text = soup.get_text(separator="\n")
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    cleaned_text = "\n".join(lines)
+
+    clean_filename = f"articles/clean/{borrower_id}_{attribute_key}_{idx}.txt"
+    with open(clean_filename, "w", encoding="utf-8") as f:
+        f.write(cleaned_text)
+
+    print(f"Cleaned text saved: {clean_filename}")
+    return clean_filename
