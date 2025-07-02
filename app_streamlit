@@ -1,0 +1,110 @@
+import streamlit as st
+import pandas as pd
+from main_serp import generate_queries, search_and_save
+
+SERPAPI_API_KEY = "YOUR_SERPAPI_KEY"
+
+QUERY_KEYS = [
+    "Stock performance outlook",
+    "Industry recession/growth",
+    "Job automation risk",
+    "Job market demand",
+    "Company M&A possibility",
+    "Product relevance",
+    "Skill obsolescence",
+    "Replaceability risk",
+    "Pollution projection",
+    "Disease risk in polluted zones",
+    "College education cost",
+    "Financial burden of children"
+]
+
+KEY_TO_INDEX = {k: i for i, k in enumerate(QUERY_KEYS)}
+
+def perform_web_search(borrower_info, selected_keys, years_ahead):
+    job_title = borrower_info["job_title"]
+    company = borrower_info["company"]
+    industry = borrower_info["industry"]
+    borrower_id = borrower_info["borrower_id"]
+
+    all_queries = generate_queries(job_title, company, industry, years_ahead)
+    selected_queries = [all_queries[KEY_TO_INDEX[key]] for key in selected_keys]
+
+    all_saved_files = []
+    for query in selected_queries:
+        saved_files = search_and_save(query, borrower_id, SERPAPI_API_KEY)
+        all_saved_files.extend(saved_files)
+
+    return all_saved_files
+
+# ---------------- Streamlit UI ----------------
+st.title("Borrower Risk Assessment Web Search Tool")
+
+st.sidebar.header("Input Mode")
+input_mode = st.sidebar.radio("Choose Input Mode:", ("Manual Form", "Upload CSV File"))
+
+years_ahead = st.sidebar.number_input("Years Ahead to Analyze", min_value=1, max_value=50, value=5)
+
+if input_mode == "Manual Form":
+    st.subheader("Borrower Information")
+
+    with st.form("borrower_form"):
+        borrower_id = st.text_input("Borrower ID")
+        borrower_name = st.text_input("Name")
+        job_title = st.text_input("Job Title")
+        company = st.text_input("Company")
+        industry = st.text_input("Industry")
+        submitted = st.form_submit_button("Next")
+
+    if submitted:
+        borrower_info = {
+            "borrower_id": borrower_id,
+            "borrower_name": borrower_name,
+            "job_title": job_title,
+            "company": company,
+            "industry": industry
+        }
+
+        st.subheader("Select Query Attributes")
+        selected_keys = [key for key in QUERY_KEYS if st.checkbox(key)]
+
+        if st.button("Submit and Search"):
+            st.info("Performing web search for this borrower...")
+            saved_files = perform_web_search(borrower_info, selected_keys, years_ahead)
+            if saved_files:
+                st.success(f"Saved {len(saved_files)} article(s).")
+                for file in saved_files:
+                    st.write(file)
+            else:
+                st.warning("No articles saved.")
+
+else:
+    st.subheader("Upload Borrower CSV File")
+    csv_file = st.file_uploader("Upload CSV", type=["csv"])
+
+    if csv_file is not None:
+        df = pd.read_csv(csv_file)
+        st.write("CSV Preview:")
+        st.dataframe(df)
+
+        st.subheader("Select Query Attributes")
+        selected_keys = [key for key in QUERY_KEYS if st.checkbox(key)]
+
+        if st.button("Submit and Search for All Borrowers"):
+            progress_bar = st.progress(0)
+            total = len(df)
+
+            for idx, row in df.iterrows():
+                borrower_info = {
+                    "borrower_id": str(row["borrower_id"]),
+                    "borrower_name": row["borrower_name"],
+                    "job_title": row["job_title"],
+                    "company": row["company"],
+                    "industry": row["industry"]
+                }
+
+                saved_files = perform_web_search(borrower_info, selected_keys, years_ahead)
+                st.write(f"Borrower ID {borrower_info['borrower_id']} - Saved {len(saved_files)} articles.")
+                progress_bar.progress((idx + 1) / total)
+
+            st.success("Completed web search for all borrowers.")
