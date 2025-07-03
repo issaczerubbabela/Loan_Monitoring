@@ -1,53 +1,38 @@
 import pandas as pd
 import json
-import os
 
-def merge_csv_with_text_json(csv_path, text_folder, output_csv_path):
-    # Load CSV
-    df = pd.read_csv(csv_path)
+# Paths
+csv_file_path = "./your_uploaded_borrower_file.csv"
+response_file_path = "./responses/response.txt"
+output_csv_path = "./processed/processed_borrower.csv"
 
-    attributes = [
-        "stock_performance_outlook", "industry_recession_or_growth", "company_M_and_A_possibility",
-        "job_automation_risk", "job_market_demand", "product_relevance",
-        "skilled_obsolescence", "replaceability_risk", "pollution_projection",
-        "disease_risk_polluted_zone", "college_education_cost", "financial_burden_children"
-    ]
+# Load CSV
+df = pd.read_csv(csv_file_path)
 
-    # Add columns for each attribute (just criticality)
-    for attr in attributes:
-        df[attr] = ""
+# Read and parse response.txt
+with open(response_file_path, "r", encoding="utf-8") as f:
+    content = f.read()
 
-    for idx, row in df.iterrows():
-        borrower_id = str(row["borrower_id"])
+# Remove the "json" word from the start
+if content.startswith("json"):
+    json_str = content[len("json"):].strip()
+else:
+    json_str = content
 
-        # File assumed to be named <borrower_id>.txt inside text_folder
-        text_file_path = os.path.join(text_folder, f"{borrower_id}.txt")
+# Load JSON
+response_json = json.loads(json_str)
 
-        if os.path.exists(text_file_path):
-            with open(text_file_path, "r", encoding="utf-8") as f:
-                content = f.read()
+# Create a dictionary to hold criticality values
+criticality_dict = {}
+for attr, info in response_json.items():
+    criticality_dict[attr] = info.get("criticality", "")
 
-            # Remove the first "JSON" line if it exists
-            if content.startswith("JSON"):
-                json_str = content[4:].strip()
-            else:
-                json_str = content.strip()
+# Add new columns to DataFrame (one per attribute)
+for attr_name, crit_value in criticality_dict.items():
+    # You can optionally make column names simpler if needed
+    col_name = attr_name.strip()
+    df[col_name] = crit_value
 
-            try:
-                data = json.loads(json_str)
-
-                for attr in attributes:
-                    if attr in data:
-                        df.at[idx, attr] = data[attr]
-            except json.JSONDecodeError:
-                print(f"⚠️ Error decoding JSON for borrower ID {borrower_id}")
-
-        else:
-            print(f"⚠️ Text file not found for borrower ID {borrower_id}")
-
-    # Save new combined CSV
-    df.to_csv(output_csv_path, index=False)
-    print(f"✅ Combined CSV saved to: {output_csv_path}")
-
-# Example usage:
-# merge_csv_with_text_json("borrowers.csv", "responses_folder", "borrowers_combined.csv")
+# Save combined CSV
+df.to_csv(output_csv_path, index=False)
+print(f"✅ Combined CSV saved to: {output_csv_path}")
