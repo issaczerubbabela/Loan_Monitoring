@@ -1,0 +1,5 @@
+=== MOCK DATA FOR TESTING ===
+
+Job Automation Trends: Which Roles Are Most At Risk?
+Artificial intelligence and automation technologies are reshaping the job market. Routine tasks face highest displacement risk while creative roles remain secure.
+https://example.com/automation-job-impact

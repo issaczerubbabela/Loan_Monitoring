@@ -1,11 +1,4 @@
 borrower_id,borrower_name,loan_amount,loan_start_year,job_title,company,industry,repayments_on_time,late_payments,avg_days_late
 101,Jane Doe,15000,2020,Software Engineer,Infosys,IT,36,0,0
 102,John Smith,25000,2020,Mechanical Engineer,Bosch,Automotive,30,6,12
-103,Alice Johnson,12000,2020,Marketing Specialist,FutureTech,Advertising,28,8,9
-104,Bob Lee,20000,2020,Data Analyst,Paytm,Fintech,36,0,0
-105,Mary Liu,18000,2020,Customer Support Executive,Airtel,Telecom,34,2,5
-106,Chris Paul,22000,2020,Manufacturing Technician,TVS Motors,Manufacturing,27,9,15
-107,Susan Miller,30000,2020,UX Designer,Zomato,Food Tech,35,1,3
-108,Tom Wang,17000,2020,HR Manager,Cognizant,IT,32,4,6
-109,Emma Davis,16000,2020,Teacher,DAV Schools,Education,36,0,0
-110,Liam Roy,14000,2020,Field Technician,BSNL,Telecom,30,6,10
+

@@ -1,0 +1,9 @@
+=== MOCK DATA FOR TESTING ===
+
+Company Stock Analysis 2025: Growth Prospects and Market Outlook
+Financial analysts predict strong growth potential with revenue increasing 15% year-over-year. Market conditions favor technology stocks with robust fundamentals.
+https://example.com/stock-analysis-2025
+
+Market Volatility Concerns: Stock Performance Under Pressure
+Recent market turbulence has impacted stock prices across sectors. Investors remain cautious about near-term performance amid economic uncertainty.
+https://example.com/market-volatility-analysis

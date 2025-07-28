@@ -246,15 +246,18 @@ if input_mode == "Manual Form":
         if debug_mode:
             with col_action3:
                 st.markdown('<div class="upload-section">', unsafe_allow_html=True)
-                st.markdown("**📁 Upload Article Files Manually**")
+                st.markdown("**📁 Upload Article Files Manually (Max 10 files)**")
                 uploaded_files = st.file_uploader("Upload article text files", type=["txt"], accept_multiple_files=True, key="debug_upload")
-                if uploaded_files and st.button("💾 Save Files", key="debug_save"):
-                    os.makedirs("articles/debug_manual", exist_ok=True)
-                    for file in uploaded_files:
-                        save_path = os.path.join("articles/debug_manual", f"{st.session_state.borrower_info['borrower_id']}_{file.name}")
-                        with open(save_path, "wb") as f:
-                            f.write(file.read())
-                    st.success("✅ Files saved manually!")
+                if uploaded_files:
+                    if len(uploaded_files) > 10:
+                        st.error(f"❌ Too many files! Please select maximum 10 files. You selected {len(uploaded_files)} files.")
+                    elif st.button("💾 Save Files", key="debug_save"):
+                        os.makedirs("articles/debug_manual", exist_ok=True)
+                        for file in uploaded_files:
+                            save_path = os.path.join("articles/debug_manual", f"{st.session_state.borrower_info['borrower_id']}_{file.name}")
+                            with open(save_path, "wb") as f:
+                                f.write(file.read())
+                        st.success("✅ Files saved manually!")
                 st.markdown('</div>', unsafe_allow_html=True)
         else:
             with col_action3:
@@ -390,15 +393,18 @@ else:  # CSV Upload Mode
         if debug_mode:
             with col_csv3:
                 st.markdown('<div class="upload-section">', unsafe_allow_html=True)
-                st.markdown("**📁 Upload Article Files (for all borrowers)**")
+                st.markdown("**📁 Upload Article Files (for all borrowers, Max 10 files)**")
                 uploaded_files = st.file_uploader("Upload article text files", type=["txt"], accept_multiple_files=True, key="csv_upload")
-                if uploaded_files and st.button("💾 Save Files", key="csv_save"):
-                    os.makedirs("articles/debug_manual", exist_ok=True)
-                    for file in uploaded_files:
-                        save_path = os.path.join("articles/debug_manual", f"debug_{file.name}")
-                        with open(save_path, "wb") as f:
-                            f.write(file.read())
-                    st.success("✅ Files saved!")
+                if uploaded_files:
+                    if len(uploaded_files) > 10:
+                        st.error(f"❌ Too many files! Please select maximum 10 files. You selected {len(uploaded_files)} files.")
+                    elif st.button("💾 Save Files", key="csv_save"):
+                        os.makedirs("articles/debug_manual", exist_ok=True)
+                        for file in uploaded_files:
+                            save_path = os.path.join("articles/debug_manual", f"debug_{file.name}")
+                            with open(save_path, "wb") as f:
+                                f.write(file.read())
+                        st.success("✅ Files saved!")
                 st.markdown('</div>', unsafe_allow_html=True)
         else:
             with col_csv3:
